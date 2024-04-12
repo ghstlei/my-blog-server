@@ -31,32 +31,39 @@ app.get("/hello/:name/goodbye/:deadname", (req, res) => {
   res.send(`Hello ${name}! Goodbye ${deadname}!`);
 });
 
-app.put("/api/articles/:name/upvote", (req, res) => {
+app.put("/api/articles/:name/upvote", async (req, res) => {
   const { name } = req.params;
-  const article = articlesInfo.find((a) => a.name === name);
+
+  const client = new MongoClient("mongodb://localhost:27017/");
+  await client.connect();
+
+  const db = client.db("react-blog-db");
+  await db.collection("articles").updateOne({ name }, { $inc: { upvotes: 1 } });
+
+  const article = await db.collection("articles").findOne({ name });
 
   if (article) {
-    article.upvotes += 1;
     res.send(`${name} article now has ${article.upvotes} upvotes.`);
   } else {
     res.send("Article not found.");
   }
 });
 
-app.post("/api/articles/:name/comments", (req, res) => {
+app.post("/api/articles/:name/comments", async (req, res) => {
   const { name } = req.params;
   const { postedBy, text } = req.body;
 
-  if (!postedBy || !text) {
-    return res
-      .status(400)
-      .send("Both 'postedBy' and 'text' fields are required.");
-  }
+  const client = new MongoClient("mongodb://localhost:27017/");
+  await client.connect();
 
-  const article = articlesInfo.find((a) => a.name === name);
+  const db = client.db("react-blog-db");
+  await db
+    .collection("articles")
+    .updateOne({ name }, { $push: { comments: { postedBy, text } } });
+
+  const article = await db.collection("articles").findOne({ name });
 
   if (article) {
-    article.comments.push({ postedBy, text });
     console.log("Article:", article);
     console.log("Article comments:", article.comments);
     res.send(article.comments);
